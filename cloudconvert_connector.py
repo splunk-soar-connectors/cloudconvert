@@ -1,0 +1,795 @@
+# File: cloudconvert_connector.py
+#
+# Copyright (c) 2022 Splunk Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under
+# the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+# either express or implied. See the License for the specific language governing permissions
+# and limitations under the License.
+#
+#
+# Phantom App imports
+from __future__ import print_function, unicode_literals
+
+import json
+import os
+import time
+import uuid
+
+import phantom.app as phantom
+import phantom.rules as ph_rules
+import requests
+import xmltodict
+from bs4 import BeautifulSoup, UnicodeDammit
+from phantom.action_result import ActionResult
+from phantom.base_connector import BaseConnector
+from phantom.vault import Vault
+
+# Usage of the consts file is recommended
+from cloudconvert_consts import *
+
+
+class RetVal(tuple):
+    def __new__(cls, val1, val2=None):
+        return tuple.__new__(RetVal, (val1, val2))
+
+
+class CloudConvertConnector(BaseConnector):
+    def __init__(self):
+
+        # Call the BaseConnectors init first
+        super(CloudConvertConnector, self).__init__()
+
+        self._state = None
+        self._headers = dict()
+        self._api_key = None
+        self._stream_file_data = False
+        self._base_url = None
+        self._timeout = None
+
+    def _get_error_message_from_exception(self, e):
+        """This function is used to get appropriate error message from the exception.
+        :param e: Exception object
+        :return: error message
+        """
+        error_msg = CLOUDCONVERT_ERROR_MESSAGE
+        error_code = CLOUDCONVERT_ERROR_CODE_MESSAGE
+        try:
+            if hasattr(e, "args"):
+                if len(e.args) > 1:
+                    error_code = e.args[0]
+                    error_msg = e.args[1]
+                elif len(e.args) == 1:
+                    error_code = CLOUDCONVERT_ERROR_CODE_MESSAGE
+                    error_msg = e.args[0]
+        except Exception as ex:
+            self.debug_print("Exception: {}".format(ex))
+            pass
+
+        if not error_code:
+            error_text = "Error Message: {}".format(error_msg)
+        else:
+            error_text = "Error Code: {}. Error Message: {}".format(error_code, error_msg)
+
+        return error_text
+
+    def _process_empty_response(self, response, action_result):
+        if response.status_code == 200:
+            return RetVal(phantom.APP_SUCCESS, {})
+
+        return RetVal(
+            action_result.set_status(
+                phantom.APP_ERROR, "Empty response and no information in the header"
+            ),
+            None,
+        )
+
+    def _process_html_response(self, response, action_result):
+        status_code = response.status_code
+
+        try:
+            soup = BeautifulSoup(response.text, "html.parser")
+            # Remove the script, style, footer and navigation part from the HTML message
+            for element in soup(["script", "style", "footer", "nav"]):
+                element.extract()
+            error_text = soup.text
+            split_lines = error_text.split("\n")
+            split_lines = [x.strip() for x in split_lines if x.strip()]
+            error_text = "\n".join(split_lines)
+        except Exception:
+            error_text = "Cannot parse error details"
+
+        message = "Status Code: {0}. Data from server:\n{1}\n".format(
+            status_code, error_text
+        )
+
+        message = message.replace("{", "{{").replace("}", "}}")
+        return RetVal(action_result.set_status(phantom.APP_ERROR, message), None)
+
+    def _process_json_response(self, r, action_result):
+        # Try a json parse
+        try:
+            resp_json = r.json()
+        except Exception as e:
+            return RetVal(
+                action_result.set_status(
+                    phantom.APP_ERROR,
+                    "Unable to parse JSON response. Error: {0}".format(str(e)),
+                ),
+                None,
+            )
+
+        # Please specify the status codes here
+        if 200 <= r.status_code < 399:
+            return RetVal(phantom.APP_SUCCESS, resp_json)
+
+        if resp_json.get('code') and resp_json.get('message'):
+            error_code = resp_json.get('code', 'No code found')
+            error_message = resp_json.get('message', 'No details found')
+            message = (
+                "Error from server. Error Code: {0} Data from server: {1}"
+            ).format(error_code, error_message)
+            return RetVal(
+                action_result.set_status(phantom.APP_ERROR, message), resp_json
+            )
+
+        # You should process the error returned in the json
+        message = "Error from server. Status Code: {0} Data from server: {1}".format(
+            r.status_code, r.text.replace("{", "{{").replace("}", "}}")
+        )
+
+        return RetVal(action_result.set_status(phantom.APP_ERROR, message), None)
+
+    def _process_xml_response(self, r, action_result):
+        resp_xml = None
+        try:
+            if r.text:
+                resp_xml = xmltodict.parse(r.text)
+        except Exception as e:
+            error_message = self._get_error_message_from_exception(e)
+            return RetVal(
+                action_result.set_status(
+                    phantom.APP_ERROR,
+                    "Unable to parse XML response. Error: {0}".format(error_message),
+                )
+            )
+
+        if 200 <= r.status_code < 400:
+            return RetVal(phantom.APP_SUCCESS, resp_xml)
+
+        message = "Error from server. Status Code: {0} Data from server: {1}".format(
+            r.status_code, r.text.replace("{", "{{").replace("}", "}}")
+        )
+
+        return RetVal(action_result.set_status(phantom.APP_ERROR, message), resp_xml)
+
+    def _process_response(self, r, action_result):
+        # store the r_text in debug data, it will get dumped in the logs if the action fails
+        if hasattr(action_result, "add_debug_data"):
+            action_result.add_debug_data({"r_status_code": r.status_code})
+            action_result.add_debug_data({"r_text": r.text})
+            if not self._stream_file_data:
+                action_result.add_debug_data({'r_text': r.text})
+            action_result.add_debug_data({'r_headers': r.headers})
+
+        if self._stream_file_data and 200 <= r.status_code < 399:
+            return RetVal(phantom.APP_SUCCESS, r)
+
+        if "json" in r.headers.get("Content-Type", ""):
+            return self._process_json_response(r, action_result)
+
+        if "html" in r.headers.get("Content-Type", ""):
+            return self._process_html_response(r, action_result)
+
+        if "xml" in r.headers.get("Content-Type", ""):
+            return self._process_xml_response(r, action_result)
+
+        if not r.text:
+            return self._process_empty_response(r, action_result)
+
+        message = "Can't process response from server. Status Code: {0} Data from server: {1}".format(
+            r.status_code, r.text.replace("{", "{{").replace("}", "}}")
+        )
+
+        return RetVal(action_result.set_status(phantom.APP_ERROR, message), None)
+
+    def _make_rest_call(
+        self,
+        url,
+        action_result,
+        headers=None,
+        params=None,
+        files=None,
+        data=None,
+        method="get",
+        empty_headers=False,
+        **kwargs
+    ):
+
+        resp_json = None
+        if headers:
+            headers.update(self._headers)
+        else:
+            headers = self._headers
+        if empty_headers:
+            headers = {}
+        try:
+            request_func = getattr(requests, method)
+        except AttributeError:
+            return action_result.set_status(phantom.APP_ERROR, "Invalid method: {0}".format(method)), resp_json
+
+        try:
+            requests_response = request_func(
+                url,
+                headers=headers,
+                data=data,
+                files=files,
+                timeout=DEFAULT_TIMEOUT_SECONDS,
+                **kwargs,
+            )
+        except Exception as e:
+            return action_result.set_status(
+                phantom.APP_ERROR, "Error connecting to server. Details: {0}".format(self._get_error_message_from_exception(e))), resp_json
+
+        return self._process_response(requests_response, action_result)
+
+    def _handle_test_connectivity(self, param):
+        # Add an action result object to self (BaseConnector) to represent the action for this param
+        action_result = self.add_action_result(ActionResult(dict(param)))
+        self.save_progress(CLOUDCONVERT_CONNECTION_MSG)
+        ret_val, _ = self._make_rest_call(
+            url=TEST_CONNECTIVITY_URL,
+            action_result=action_result,
+            method="get"
+        )
+
+        if phantom.is_fail(ret_val):
+            self.save_progress(CLOUDCONVERT_CONNECTIVITY_FAIL_MSG)
+            return action_result.get_status()
+        self.save_progress(CLOUDCONVERT_CONNECTIVITY_PASS_MSG)
+        return action_result.set_status(phantom.APP_SUCCESS)
+
+    def _get_file_info_from_vault(self, action_result, vault_id, file_type=None):
+        file_info = {
+            "id": vault_id
+        }
+
+        # Check for file in vault
+        try:
+            _, _, vault_meta = ph_rules.vault_info(
+                container_id=self.get_container_id(), vault_id=vault_id
+            )
+            if not vault_meta:
+                self.debug_print(
+                    "Error while fetching meta information for vault ID: {}".format(
+                        vault_id
+                    )
+                )
+                return action_result.set_status(phantom.APP_ERROR, CLOUDCONVERT_ERR_FILE_NOT_IN_VAULT), None
+            vault_meta = list(vault_meta)
+        except Exception:
+            return action_result.set_status(phantom.APP_ERROR, CLOUDCONVERT_ERR_FILE_NOT_IN_VAULT), None
+
+        file_meta = None
+        try:
+            for meta in vault_meta:
+                if meta.get("container_id") == self.get_container_id():
+                    file_meta = meta
+                    break
+            else:
+                self.debug_print(
+                    "Unable to find a file for the vault ID: "
+                    "'{0}' in the container ID: '{1}'".format(
+                        vault_id, self.get_container_id()
+                    )
+                )
+        except Exception:
+            self.debug_print(
+                "Error occurred while finding a file for the vault ID: "
+                "'{0}' in the container ID: '{1}'".format(
+                    vault_id, self.get_container_id()
+                )
+            )
+            self.debug_print("Considering the first file as the required file")
+            file_meta = vault_meta[0]
+
+        if not file_meta:
+            self.debug_print(
+                "Unable to find a file for the vault ID: "
+                "'{0}' in the container ID: '{1}'".format(
+                    vault_id, self.get_container_id()
+                )
+            )
+            self.debug_print("Considering the first file as the required file")
+            file_meta = vault_meta[0]
+
+        file_info["path"] = file_meta["path"]
+        file_info["name"] = file_meta["name"]
+
+        # We set the file type to the provided type in the action run
+        # instead of keeping it as the default detected file type.
+        if file_type:
+            file_info["type"] = file_type
+        else:
+            file_type = file_meta["name"].split(".")[-1]
+            file_info["type"] = file_type
+
+        return action_result.set_status(phantom.APP_SUCCESS, "File info fetched successfully"), file_info
+
+    def _handle_convert_file(self, param):
+        action_result = self.add_action_result(ActionResult(dict(param)))
+
+        vault_id = param.get("vault_id")
+
+        ret_val, file_info = self._get_file_info_from_vault(
+            action_result, vault_id
+        )
+        if phantom.is_fail(ret_val):
+            return ret_val
+
+        filepath = file_info["path"]
+        filename = file_info["name"]
+        input_filetype = file_info["type"]
+
+        ret_val, payload, job_id = self._initialize_job(
+            param, action_result, input_filetype)
+        if phantom.is_fail(ret_val):
+            return action_result.get_status()
+
+        ret_val = self._import_task(
+            param, action_result, payload, filepath, filename)
+        if phantom.is_fail(ret_val):
+            return action_result.get_status()
+
+        ret_val, link = self._get_link(param, action_result, job_id)
+        if phantom.is_fail(ret_val):
+            return action_result.get_status()
+
+        ret_val, vault_info = self._get_converted_file(
+            param, action_result, link, filename)
+        if phantom.is_fail(ret_val):
+            return action_result.get_status()
+
+        # Vault Artifact
+        cef_artifact = dict()
+        container_id = vault_info['container_id']
+        output_filename = vault_info['name']
+
+        if output_filename:
+            cef_artifact.update({'fileName': output_filename})
+        if vault_info['vault_id']:
+            cef_artifact.update({
+                'vaultId': vault_info['vault_id'],
+                'cs6': vault_info['vault_id'],
+                'cs6Label': 'Vault ID'
+            })
+            self._add_vault_hashes_to_dictionary(
+                cef_artifact, vault_info['vault_id'], container_id)
+        if not cef_artifact:
+            pass
+
+        artifact = {}
+        artifact['name'] = 'Vault Artifact'
+        artifact['cef'] = cef_artifact
+        artifact['container_id'] = vault_info['container_id']
+
+        self.debug_print(
+            "Adding Source Data Identifier to the Vault artifact")
+
+        ret_val, message, ids = self.save_artifact(artifact)
+        self.debug_print(
+            "save_artifacts returns, value: {0}, reason: {1}".format(ret_val, message))
+
+        if phantom.is_fail(ret_val):
+            message = "Failed to save ingested artifacts, error msg: {0}".format(
+                message)
+            return action_result.set_status(phantom.APP_ERROR, message)
+        action_result.add_data({
+            "vault_id": vault_info['vault_id'],
+            "converted_file": output_filename
+        })
+        return action_result.set_status(phantom.APP_SUCCESS, "File converted successfully")
+
+    def _add_vault_hashes_to_dictionary(self, cef_artifact, vault_id, container_id):
+
+        try:
+            success, message, vault_info = ph_rules.vault_info(
+                vault_id=vault_id, container_id=container_id)
+        except Exception:
+            return phantom.APP_ERROR, "Could not retrieve vault file"
+
+        if not vault_info:
+            return (phantom.APP_ERROR, "Vault ID not found")
+
+        # The return value is a list, each item represents an item in the vault
+        # matching the vault id, the info that we are looking for (the hashes)
+        # will be the same for every entry, so just access the first one
+        try:
+            metadata = vault_info[0].get('metadata')
+        except Exception:
+            return (phantom.APP_ERROR, "Failed to get vault item metadata")
+
+        try:
+            cef_artifact['fileHashSha256'] = metadata['sha256']
+        except Exception:
+            pass
+
+        try:
+            cef_artifact['fileHashMd5'] = metadata['md5']
+        except Exception:
+            pass
+
+        try:
+            cef_artifact['fileHashSha1'] = metadata['sha1']
+        except Exception:
+            pass
+
+        return (phantom.APP_SUCCESS, "Mapped hash values")
+
+    def _get_dictionary(self, param, action_result):
+        url = GET_DICTIONARY_URL
+        valid_input_output_format_dict = {}
+
+        ret_val, response = self._make_rest_call(
+            url=url,
+            action_result=action_result,
+            method="get",
+        )
+        if phantom.is_fail(ret_val):
+            return action_result.get_status(), None
+
+        for i in response.get("data"):
+            if i["input_format"] not in valid_input_output_format_dict.keys():
+                valid_input_output_format_dict.update({i["input_format"]: []})
+            if i["output_format"] not in valid_input_output_format_dict[i["input_format"]]:
+                valid_input_output_format_dict[i["input_format"]].append(i["output_format"])
+
+        return action_result.set_status(phantom.APP_SUCCESS, "Got Dictionary"), valid_input_output_format_dict
+
+    def _handle_get_valid_filetypes(self, param):
+        action_result = self.add_action_result(ActionResult(dict(param)))
+        input_filetype = param['filetype']
+        resulting_dict = dict()
+
+        ret_val, valid_format_dict = self._get_dictionary(param, action_result)
+        if phantom.is_fail(ret_val):
+            return action_result.get_status()
+
+        for input_format in valid_format_dict:
+            if input_format == input_filetype:
+                resulting_dict = ({
+                    "input_format": input_format,
+                    "output_format": valid_format_dict[input_format]
+                })
+        action_result.add_data(resulting_dict)
+        return action_result.set_status(phantom.APP_SUCCESS, "Successfully fetched valid output formats")
+
+    def _get_converted_file(self, param, action_result, link, filename):
+
+        url = link
+        output_filetype = param['filetype']
+        filename = filename.split(".")[0]
+        self._stream_file_data = True
+
+        ret_val, response = self._make_rest_call(
+            url=url,
+            action_result=action_result,
+            method="get",
+            empty_headers=True
+        )
+        if phantom.is_fail(ret_val):
+            return action_result.get_status(), None
+
+        guid = uuid.uuid4()
+
+        if hasattr(Vault, 'get_vault_tmp_dir'):
+            vault_tmp_dir = Vault.get_vault_tmp_dir().rstrip('/')
+            local_dir = '{}/{}'.format(vault_tmp_dir, guid)
+        else:
+            local_dir = '/opt/phantom/vault/tmp/{}'.format(guid)
+        output_filename = "{}.{}".format(filename, output_filetype)
+
+        self.save_progress("Using temp directory: {0}".format(guid))
+        self.debug_print("Using temp directory: {0}".format(guid))
+
+        try:
+            os.makedirs(local_dir)
+        except Exception as e:
+            return action_result.set_status(
+                phantom.APP_ERROR, "Unable to create temporary vault folder.", self._get_error_message_from_exception(e)), None
+
+        compressed_file_path = "{0}/{1}".format(local_dir, output_filename)
+
+        # Try to stream the response to a file
+        if response.status_code == 200:
+            try:
+                compressed_file_path = UnicodeDammit(compressed_file_path).unicode_markup
+                with open(compressed_file_path, 'wb') as f:
+                    if self._stream_file_data:
+                        for chunk in response.iter_content(chunk_size=10 * 1024 * 1024):
+                            f.write(chunk)
+                    else:
+                        f.write(response.content)
+            except IOError as e:
+                error_message = self._get_error_message_from_exception(e)
+                if "File name too long" in error_message:
+                    new_file_name = "ph_long_file_name_temp"
+                    compressed_file_path = "{0}/{1}".format(local_dir, new_file_name)
+                    self.debug_print('Original filename : {}'.format(filename))
+                    self.debug_print('Modified filename : {}'.format(new_file_name))
+                    with open(compressed_file_path, 'wb') as f:
+                        if self._stream_file_data:
+                            for chunk in response.iter_content(chunk_size=10 * 1024 * 1024):
+                                f.write(chunk)
+                        else:
+                            f.write(response.content)
+                else:
+                    return action_result.set_status(phantom.APP_ERROR,
+                            "Unable to write file to disk. Error: {0}".format(self._get_error_message_from_exception(e))), None
+
+            except Exception as e:
+                return action_result.set_status(
+                        phantom.APP_ERROR, "Unable to write file to disk. Error: {0}".format(self._get_error_message_from_exception(e))), None
+
+        try:
+            vault_results = ph_rules.vault_add(
+                container=self.get_container_id(), file_location=compressed_file_path, file_name=output_filename)
+            if vault_results[0]:
+                try:
+                    _, _, vault_result_information = ph_rules.vault_info(
+                        vault_id=vault_results[2], container_id=self.get_container_id(), file_name=output_filename)
+                    if not vault_result_information:
+                        vault_result_information = None
+                        # If filename contains special characters, vault_info will return None when passing filename as argument,
+                        # hence this call is executed
+                        _, _, vault_info = ph_rules.vault_info(
+                            vault_id=vault_results[2], container_id=self.get_container_id())
+                        if vault_info:
+                            for vault_meta_info in vault_info:
+                                if vault_meta_info['name'] == output_filename:
+                                    vault_result_information = [
+                                        vault_meta_info]
+                                    break
+                    vault_info = list(vault_result_information)[0]
+                except IndexError:
+                    return action_result.set_status(phantom.APP_ERROR, "Vault file could not be found with supplied Vault ID"), None
+                except Exception as e:
+                    return action_result.set_status(phantom.APP_ERROR,
+                                                           "Vault ID not valid: {}".format(self._get_error_message_from_exception(e))), None
+        except Exception as e:
+            return action_result.set_status(phantom.APP_ERROR,
+                "Unable to store file in Phantom Vault. Error: {0}".format(self._get_error_message_from_exception(e))), None
+        return action_result.set_status(phantom.APP_SUCCESS, "File converted successfully"), vault_info
+
+    def _get_link(self, param, action_result, job_id):
+        url = ("{}{}".format(GET_LINK_URL, job_id))
+        result_dict = None
+        timeout = self._timeout
+        counter = 0
+        sleep_seconds = 30
+
+        timeout_in_sec = 60 * timeout
+
+        while counter < timeout_in_sec:
+            ret_val, response = self._make_rest_call(
+                url=url,
+                action_result=action_result,
+                method="get"
+            )
+            if phantom.is_fail(ret_val):
+                return action_result.get_status(), None
+            time.sleep(sleep_seconds)
+            counter += sleep_seconds
+            for task in response.get("data"):
+                if task.get("job_id") == job_id:
+                    if task.get('status') == 'error' and task.get('name') == 'task':
+                        return action_result.set_status(
+                            phantom.APP_ERROR, "Error code: {}. Error message: {}".format(task.get('code'), task.get('message'))), None
+                    elif task.get('name') == 'export':
+                        result_dict = task.get("result")
+            if result_dict:
+                break
+        if counter >= timeout_in_sec:
+            return action_result.set_status(phantom.APP_ERROR, "Timeout has finished. File is not converted"), None
+
+        files_dict = result_dict.get("files")
+        files_dict_list = files_dict[0]
+        link = files_dict_list.get("url")
+
+        return action_result.set_status(phantom.APP_SUCCESS, "Link fetched successfully"), link
+
+    def _import_task(self, param, action_result, payload, filepath, filename):
+        url = IMPORT_TASK_URL
+        files = [("file", (filename, open(filepath, "rb")))]
+
+        get_key = payload["key"].split("/")[0]
+        payload["key"] = "{}/{}".format(get_key, filename)
+
+        ret_val, _ = self._make_rest_call(
+            url=url,
+            action_result=action_result,
+            data=payload,
+            files=files,
+            method="post",
+        )
+        if phantom.is_fail(ret_val):
+            return action_result.get_status()
+
+        return action_result.set_status(phantom.APP_SUCCESS, "File imported successfully")
+
+    def _initialize_job(self, param, action_result, input_filetype):
+        input_filetype = input_filetype
+        output_filetype = param['filetype']
+        url = INITIALIZE_JOB_URL
+        headers = {
+            "Content-Type": "application/json"
+        }
+
+        ret_val, valid_format_dict = self._get_dictionary(param, action_result)
+        if phantom.is_fail(ret_val):
+            return action_result.get_status(), None, None
+
+        for input_format in valid_format_dict:
+            if input_format == input_filetype:
+                if output_filetype not in valid_format_dict[input_format]:
+                    return action_result.set_status(phantom.APP_ERROR, """Error: You cannot convert .{0} file into .{1} file.
+                        Here is a list of valid file formats you can convert the .{0} file into: {2}.""".format(
+                            input_filetype, output_filetype, valid_format_dict[input_filetype]
+                        )), None, None
+
+        payload = json.dumps(
+            {
+                "tasks": {
+                    "import": {
+                        "operation": "import/upload"
+                    },
+                    "task": {
+                        "operation": "convert",
+                        "input": ["import"],
+                        "output_format": output_filetype,
+                    },
+                    "export": {
+                        "operation": "export/url",
+                        "input": ["task"],
+                        "inline": False,
+                        "archive_multiple_files": False,
+                    },
+                },
+                "tag": "jobbuilder",
+            }
+        )
+
+        ret_val, response = self._make_rest_call(
+            url=url,
+            action_result=action_result,
+            headers=headers,
+            data=payload,
+            method="post",
+        )
+        if phantom.is_fail(ret_val):
+            return action_result.get_status(), None, None
+
+        get_task = response.get("data").get("tasks")
+        get_import_task = get_task[0]
+        get_import_task_parameters = (
+            get_import_task.get("result").get("form").get("parameters")
+        )
+        get_import_task_job_id = get_import_task.get("job_id")
+        payload = get_import_task_parameters
+
+        return action_result.set_status(phantom.APP_SUCCESS, "Job initialized successfully"), payload, get_import_task_job_id
+
+    def handle_action(self, param):
+        ret_val = phantom.APP_SUCCESS
+
+        # Get the action that we are supposed to execute for this App Run
+        action_id = self.get_action_identifier()
+
+        self.debug_print("action_id", self.get_action_identifier())
+
+        if action_id == "test_connectivity":
+            ret_val = self._handle_test_connectivity(param)
+
+        if action_id == "get_valid_filetypes":
+            ret_val = self._handle_get_valid_filetypes(param)
+
+        if action_id == "convert_file":
+            ret_val = self._handle_convert_file(param)
+
+        return ret_val
+
+    def initialize(self):
+        # Load the state in initialize, use it to store data
+        # that needs to be accessed across actions
+        self._state = self.load_state()
+        if not isinstance(self._state, dict):
+            self.debug_print("Resetting the state file with the default format")
+            self._state = {"app_version": self.get_app_json().get("app_version")}
+
+        config = self.get_config()
+        self._timeout = config.get('timeout', 1)
+        self._api_key = config['api_key']
+        self._headers = {
+            "Authorization": "Bearer {}".format(self._api_key)
+        }
+        return phantom.APP_SUCCESS
+
+    def finalize(self):
+        # Save the state, this data is saved across actions and app upgrades
+        self.save_state(self._state)
+        return phantom.APP_SUCCESS
+
+
+def main():
+    import argparse
+
+    argparser = argparse.ArgumentParser()
+
+    argparser.add_argument("input_test_json", help="Input Test JSON file")
+    argparser.add_argument("-u", "--username", help="username", required=False)
+    argparser.add_argument("-p", "--password", help="password", required=False)
+
+    args = argparser.parse_args()
+    session_id = None
+
+    username = args.username
+    password = args.password
+
+    if username is not None and password is None:
+
+        # User specified a username but not a password, so ask
+        import getpass
+
+        password = getpass.getpass("Password: ")
+
+    if username and password:
+        try:
+            login_url = CloudConvertConnector._get_phantom_base_url() + "/login"
+
+            print("Accessing the Login page")
+            r = requests.get(login_url, verify=False)
+            csrftoken = r.cookies["csrftoken"]
+
+            data = dict()
+            data["username"] = username
+            data["password"] = password
+            data["csrfmiddlewaretoken"] = csrftoken
+
+            headers = dict()
+            headers["Cookie"] = "csrftoken=" + csrftoken
+            headers["Referer"] = login_url
+
+            print("Logging into Platform to get the session id")
+            r2 = requests.post(login_url, verify=False,
+                               data=data, headers=headers)
+            session_id = r2.cookies["sessionid"]
+        except Exception as e:
+            print("Unable to get session id from the platform. Error: " + str(e))
+            exit(1)
+
+    with open(args.input_test_json) as f:
+        in_json = f.read()
+        in_json = json.loads(in_json)
+        print(json.dumps(in_json, indent=4))
+
+        connector = CloudConvertConnector()
+        connector.print_progress_message = True
+
+        if session_id is not None:
+            in_json["user_session_token"] = session_id
+            connector._set_csrf_info(csrftoken, headers["Referer"])
+
+        ret_val = connector._handle_action(json.dumps(in_json), None)
+        print(json.dumps(json.loads(ret_val), indent=4))
+
+    exit(0)
+
+
+if __name__ == "__main__":
+    main()
