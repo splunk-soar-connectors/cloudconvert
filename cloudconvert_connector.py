@@ -75,7 +75,7 @@ class CloudConvertConnector(BaseConnector):
         if not error_code:
             error_text = "Error Message: {}".format(error_msg)
         else:
-            error_text = "Error Code: {}. Error Message: {}".format(error_code, error_msg)
+            error_text = CLOUDCONVERT_ERROR_MESSAGE_FORMAT.format(error_code, error_msg)
 
         return error_text
 
@@ -129,7 +129,7 @@ class CloudConvertConnector(BaseConnector):
         if 200 <= r.status_code < 399:
             return RetVal(phantom.APP_SUCCESS, resp_json)
 
-        if resp_json.get('code') and resp_json.get('message'):
+        if resp_json.get('code', "") and resp_json.get('message', ""):
             error_code = resp_json.get('code', 'No code found')
             error_message = resp_json.get('message', 'No details found')
             message = (
@@ -255,7 +255,7 @@ class CloudConvertConnector(BaseConnector):
         self.save_progress(CLOUDCONVERT_CONNECTIVITY_PASS_MSG)
         return action_result.set_status(phantom.APP_SUCCESS)
 
-    def _get_file_info_from_vault(self, action_result, vault_id, file_type=None):
+    def _get_file_info_from_vault(self, action_result, vault_id, input_filename=None):
         file_info = {
             "id": vault_id
         }
@@ -272,52 +272,28 @@ class CloudConvertConnector(BaseConnector):
                     )
                 )
                 return action_result.set_status(phantom.APP_ERROR, CLOUDCONVERT_ERR_FILE_NOT_IN_VAULT), None
-            vault_meta = list(vault_meta)
         except Exception:
             return action_result.set_status(phantom.APP_ERROR, CLOUDCONVERT_ERR_FILE_NOT_IN_VAULT), None
 
-        file_meta = None
-        try:
-            for meta in vault_meta:
-                if meta.get("container_id") == self.get_container_id():
-                    file_meta = meta
+        vault_meta = list(vault_meta)
+        vault_meta_dict = {}
+        if input_filename:
+            for vault_data in vault_meta:
+                if vault_data.get('name', "") == input_filename:
+                    vault_meta_dict.update(vault_data)
                     break
-            else:
-                self.debug_print(
-                    "Unable to find a file for the vault ID: "
-                    "'{0}' in the container ID: '{1}'".format(
-                        vault_id, self.get_container_id()
-                    )
-                )
-        except Exception:
-            self.debug_print(
-                "Error occurred while finding a file for the vault ID: "
-                "'{0}' in the container ID: '{1}'".format(
-                    vault_id, self.get_container_id()
-                )
-            )
-            self.debug_print("Considering the first file as the required file")
-            file_meta = vault_meta[0]
+            if not vault_meta_dict:
+                return action_result.set_status(phantom.APP_ERROR, CLOUDCONVERT_ERR_FILENAME_NOT_IN_VAULT), None
+        else:
+            vault_meta_dict = vault_meta[0]
 
-        if not file_meta:
-            self.debug_print(
-                "Unable to find a file for the vault ID: "
-                "'{0}' in the container ID: '{1}'".format(
-                    vault_id, self.get_container_id()
-                )
-            )
-            self.debug_print("Considering the first file as the required file")
-            file_meta = vault_meta[0]
-
-        file_info["path"] = file_meta["path"]
-        file_info["name"] = file_meta["name"]
+        file_info["path"] = vault_meta_dict["path"]
+        file_info["name"] = vault_meta_dict["name"]
 
         # We set the file type to the provided type in the action run
         # instead of keeping it as the default detected file type.
-        if file_type:
-            file_info["type"] = file_type
-        else:
-            file_type = file_meta["name"].split(".")[-1]
+        if not input_filename:
+            file_type = vault_meta_dict["name"].split(".")[-1]
             file_info["type"] = file_type
 
         return action_result.set_status(phantom.APP_SUCCESS, "File info fetched successfully"), file_info
@@ -325,25 +301,26 @@ class CloudConvertConnector(BaseConnector):
     def _handle_convert_file(self, param):
         action_result = self.add_action_result(ActionResult(dict(param)))
 
-        vault_id = param.get("vault_id")
+        vault_id = param["vault_id"]
+        input_filename = param.get("input_filename")
 
         ret_val, file_info = self._get_file_info_from_vault(
-            action_result, vault_id
+            action_result, vault_id, input_filename
         )
         if phantom.is_fail(ret_val):
             return ret_val
 
+        if not input_filename:
+            input_filename = file_info["name"]
         filepath = file_info["path"]
-        filename = file_info["name"]
-        input_filetype = file_info["type"]
 
         ret_val, payload, job_id = self._initialize_job(
-            param, action_result, input_filetype)
+            param, action_result)
         if phantom.is_fail(ret_val):
             return action_result.get_status()
 
         ret_val = self._import_task(
-            param, action_result, payload, filepath, filename)
+            param, action_result, payload, filepath, input_filename)
         if phantom.is_fail(ret_val):
             return action_result.get_status()
 
@@ -352,7 +329,7 @@ class CloudConvertConnector(BaseConnector):
             return action_result.get_status()
 
         ret_val, vault_info = self._get_converted_file(
-            param, action_result, link, filename)
+            param, action_result, link, input_filename)
         if phantom.is_fail(ret_val):
             return action_result.get_status()
 
@@ -444,18 +421,20 @@ class CloudConvertConnector(BaseConnector):
         if phantom.is_fail(ret_val):
             return action_result.get_status(), None
 
-        for i in response.get("data"):
-            if i["input_format"] not in valid_input_output_format_dict.keys():
-                valid_input_output_format_dict.update({i["input_format"]: []})
-            if i["output_format"] not in valid_input_output_format_dict[i["input_format"]]:
-                valid_input_output_format_dict[i["input_format"]].append(i["output_format"])
+        for format_dict in response.get("data"):
+            if format_dict["input_format"] not in valid_input_output_format_dict.keys():
+                valid_input_output_format_dict.update({format_dict["input_format"]: []})
+            if format_dict["output_format"] not in valid_input_output_format_dict[format_dict["input_format"]]:
+                valid_input_output_format_dict[format_dict["input_format"]].append(format_dict["output_format"])
 
-        return action_result.set_status(phantom.APP_SUCCESS, "Got Dictionary"), valid_input_output_format_dict
+        return action_result.set_status(phantom.APP_SUCCESS, "Successfully created a list of valid formats"), valid_input_output_format_dict
 
     def _handle_get_valid_filetypes(self, param):
+        self.save_progress("In action handler for: {0}".format(self.get_action_identifier()))
         action_result = self.add_action_result(ActionResult(dict(param)))
         input_filetype = param['filetype']
         resulting_dict = dict()
+        self.save_progress("Fetching valid output file formats for .{} input file".format(input_filetype))
 
         ret_val, valid_format_dict = self._get_dictionary(param, action_result)
         if phantom.is_fail(ret_val):
@@ -586,21 +565,28 @@ class CloudConvertConnector(BaseConnector):
                 return action_result.get_status(), None
             time.sleep(sleep_seconds)
             counter += sleep_seconds
-            for task in response.get("data"):
-                if task.get("job_id") == job_id:
-                    if task.get('status') == 'error' and task.get('name') == 'task':
-                        return action_result.set_status(
-                            phantom.APP_ERROR, "Error code: {}. Error message: {}".format(task.get('code'), task.get('message'))), None
-                    elif task.get('name') == 'export':
-                        result_dict = task.get("result")
+            for task in response.get("data", {}):
+                if task.get("job_id", "") == job_id:
+                    if task.get('status', "") == 'error':
+                        if task.get('name', "") in ['import', 'task', 'export']:
+                            if task.get('name', "") == 'task' and task.get('code') == "INVALID_CONVERSION_TYPE":
+                                return action_result.set_status(phantom.APP_ERROR,
+                                    "{}. Please run the 'get valid filetypes' action to get valid output file formats".format(
+                                        CLOUDCONVERT_ERROR_MESSAGE_FORMAT.format(task.get('code', 'No error code found'),
+                                            task.get('message', "No error message found")))), None
+                            return action_result.set_status(
+                                    phantom.APP_ERROR, CLOUDCONVERT_ERROR_MESSAGE_FORMAT.format(
+                                        task.get('code', 'No error code found'), task.get('message', "No error message found"))), None
+                    elif task.get('name', "") == 'export':
+                        result_dict = task.get("result", {})
             if result_dict:
                 break
         if counter >= timeout_in_sec:
             return action_result.set_status(phantom.APP_ERROR, "Timeout has finished. File is not converted"), None
 
-        files_dict = result_dict.get("files")
+        files_dict = result_dict.get("files", {})
         files_dict_list = files_dict[0]
-        link = files_dict_list.get("url")
+        link = files_dict_list.get("url", "")
 
         return action_result.set_status(phantom.APP_SUCCESS, "Link fetched successfully"), link
 
@@ -608,40 +594,24 @@ class CloudConvertConnector(BaseConnector):
         url = IMPORT_TASK_URL
         files = [("file", (filename, open(filepath, "rb")))]
 
-        get_key = payload["key"].split("/")[0]
-        payload["key"] = "{}/{}".format(get_key, filename)
-
         ret_val, _ = self._make_rest_call(
             url=url,
             action_result=action_result,
             data=payload,
             files=files,
-            method="post",
+            method="post"
         )
         if phantom.is_fail(ret_val):
             return action_result.get_status()
 
         return action_result.set_status(phantom.APP_SUCCESS, "File imported successfully")
 
-    def _initialize_job(self, param, action_result, input_filetype):
-        input_filetype = input_filetype
+    def _initialize_job(self, param, action_result):
         output_filetype = param['filetype']
         url = INITIALIZE_JOB_URL
         headers = {
             "Content-Type": "application/json"
         }
-
-        ret_val, valid_format_dict = self._get_dictionary(param, action_result)
-        if phantom.is_fail(ret_val):
-            return action_result.get_status(), None, None
-
-        for input_format in valid_format_dict:
-            if input_format == input_filetype:
-                if output_filetype not in valid_format_dict[input_format]:
-                    return action_result.set_status(phantom.APP_ERROR, """Error: You cannot convert .{0} file into .{1} file.
-                        Here is a list of valid file formats you can convert the .{0} file into: {2}.""".format(
-                            input_filetype, output_filetype, valid_format_dict[input_filetype]
-                        )), None, None
 
         payload = json.dumps(
             {
@@ -675,12 +645,12 @@ class CloudConvertConnector(BaseConnector):
         if phantom.is_fail(ret_val):
             return action_result.get_status(), None, None
 
-        get_task = response.get("data").get("tasks")
+        get_task = response.get("data", {}).get("tasks", [])
         get_import_task = get_task[0]
         get_import_task_parameters = (
-            get_import_task.get("result").get("form").get("parameters")
+            get_import_task.get("result", {}).get("form", {}).get("parameters", {})
         )
-        get_import_task_job_id = get_import_task.get("job_id")
+        get_import_task_job_id = get_import_task.get("job_id", "")
         payload = get_import_task_parameters
 
         return action_result.set_status(phantom.APP_SUCCESS, "Job initialized successfully"), payload, get_import_task_job_id
@@ -728,18 +698,21 @@ class CloudConvertConnector(BaseConnector):
 
 def main():
     import argparse
+    import sys
 
     argparser = argparse.ArgumentParser()
 
     argparser.add_argument("input_test_json", help="Input Test JSON file")
     argparser.add_argument("-u", "--username", help="username", required=False)
     argparser.add_argument("-p", "--password", help="password", required=False)
+    argparser.add_argument('-v', '--verify', action='store_true', help='verify', required=False, default=False)
 
     args = argparser.parse_args()
     session_id = None
 
     username = args.username
     password = args.password
+    verify = args.verify
 
     if username is not None and password is None:
 
@@ -753,7 +726,7 @@ def main():
             login_url = CloudConvertConnector._get_phantom_base_url() + "/login"
 
             print("Accessing the Login page")
-            r = requests.get(login_url, verify=False)
+            r = requests.get(login_url, verify=verify, timeout=DEFAULT_TIMEOUT_SECONDS)
             csrftoken = r.cookies["csrftoken"]
 
             data = dict()
@@ -766,12 +739,11 @@ def main():
             headers["Referer"] = login_url
 
             print("Logging into Platform to get the session id")
-            r2 = requests.post(login_url, verify=False,
-                               data=data, headers=headers)
+            r2 = requests.post(login_url, verify=verify, data=data, headers=headers, timeout=DEFAULT_TIMEOUT_SECONDS)
             session_id = r2.cookies["sessionid"]
         except Exception as e:
             print("Unable to get session id from the platform. Error: " + str(e))
-            exit(1)
+            sys.exit(1)
 
     with open(args.input_test_json) as f:
         in_json = f.read()
@@ -788,7 +760,7 @@ def main():
         ret_val = connector._handle_action(json.dumps(in_json), None)
         print(json.dumps(json.loads(ret_val), indent=4))
 
-    exit(0)
+    sys.exit(0)
 
 
 if __name__ == "__main__":

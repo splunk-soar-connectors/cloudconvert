@@ -25,6 +25,7 @@ CLOUDCONVERT_CONNECTIVITY_PASS_MSG = 'Test Connectivity Passed'
 CLOUDCONVERT_CONFIG_API_KEY = 'api_key'  # pragma: allowlist secret
 # Get file info from vault
 CLOUDCONVERT_ERR_FILE_NOT_IN_VAULT = "Could not find specified vault ID in vault"
+CLOUDCONVERT_ERR_FILENAME_NOT_IN_VAULT = "Could not find file with specified filename in vault"
 # Get dictionary
 GET_DICTIONARY_URL = 'https://api.cloudconvert.com/v2/convert/formats'
 # Get link
@@ -38,4 +39,5 @@ CLOUDCONVERT_ERROR_CODE_MESSAGE = "Error code unavailable"
 CLOUDCONVERT_ERROR_MESSAGE = "Unknown error occurred. Please check the asset configuration and|or action parameters"
 TYPE_ERROR_MESSAGE = "Error occurred while connecting to the HTTP server. " \
                      "Please check the asset configuration and|or the action parameters"
+CLOUDCONVERT_ERROR_MESSAGE_FORMAT = "Error code: {}. Error message: {}"
 DEFAULT_TIMEOUT_SECONDS = 60   # in seconds
