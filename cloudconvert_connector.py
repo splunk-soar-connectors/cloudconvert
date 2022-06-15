@@ -155,7 +155,7 @@ class CloudConvertConnector(BaseConnector):
         if 200 <= r.status_code < 399:
             return RetVal(phantom.APP_SUCCESS, resp_json)
 
-        if resp_json.get('code', "") and resp_json.get('message', ""):
+        if resp_json.get('code') and resp_json.get('message'):
             error_code = resp_json.get('code', 'No code found')
             error_message = resp_json.get('message', 'No details found')
             message = (
@@ -304,7 +304,7 @@ class CloudConvertConnector(BaseConnector):
         vault_meta_dict = {}
         if input_filename:
             for vault_data in vault_meta:
-                if vault_data.get('name', "") == input_filename:
+                if vault_data.get('name') == input_filename:
                     vault_meta_dict.update(vault_data)
                     break
             if not vault_meta_dict:
@@ -590,28 +590,47 @@ class CloudConvertConnector(BaseConnector):
                 return action_result.get_status(), None
             time.sleep(sleep_seconds)
             counter += sleep_seconds
-            for task in response.get("data", {}):
-                if task.get("job_id", "") == job_id:
-                    if task.get('status', "") == 'error':
-                        if task.get('name', "") in ['import', 'task', 'export']:
-                            if task.get('name', "") == 'task' and task.get('code') == "INVALID_CONVERSION_TYPE":
-                                return action_result.set_status(phantom.APP_ERROR,
-                                    "{}. Please run the 'get valid filetypes' action to get valid output file formats".format(
-                                        CLOUDCONVERT_ERROR_MESSAGE_FORMAT.format(task.get('code', 'No error code found'),
-                                            task.get('message', "No error message found")))), None
-                            return action_result.set_status(
-                                    phantom.APP_ERROR, CLOUDCONVERT_ERROR_MESSAGE_FORMAT.format(
-                                        task.get('code', 'No error code found'), task.get('message', "No error message found"))), None
-                    elif task.get('name', "") == 'export':
-                        result_dict = task.get("result", {})
+            import_task, convert_task, export_task = None, None, None
+            for task in response.get("data"):
+                if task.get("job_id") == job_id:
+                    if task.get('name') == 'import':
+                        import_task = task
+                        continue
+                    if task.get('name') == 'task':
+                        convert_task = task
+                        continue
+                    if task.get('name') == 'export':
+                        export_task = task
+                        continue
+                    if import_task and convert_task and export_task:
+                        break
+            if import_task.get('status') == 'error':
+                return action_result.set_status(
+                        phantom.APP_ERROR, "Error while uploading a file. {}".format(CLOUDCONVERT_ERROR_MESSAGE_FORMAT.format(
+                            import_task.get('code', 'No error code found'), import_task.get('message', "No error message found")))), None
+            elif convert_task.get('status') == 'error':
+                if convert_task.get('code') == "INVALID_CONVERSION_TYPE":
+                    return action_result.set_status(phantom.APP_ERROR,
+                       "Error while converting a file. {}. Please run the 'get valid filetypes' action to get valid output file formats".format(
+                            CLOUDCONVERT_ERROR_MESSAGE_FORMAT.format(convert_task.get('code', 'No error code found'),
+                                convert_task.get('message', "No error message found")))), None
+                return action_result.set_status(
+                        phantom.APP_ERROR, "Error while converting a file. {}".format(CLOUDCONVERT_ERROR_MESSAGE_FORMAT.format(
+                            import_task.get('code', 'No error code found'), import_task.get('message', "No error message found")))), None
+            elif export_task.get('status') == 'error':
+                return action_result.set_status(
+                        phantom.APP_ERROR, "Error while downloading the converted file. {}".format(CLOUDCONVERT_ERROR_MESSAGE_FORMAT.format(
+                            export_task.get('code', 'No error code found'), export_task.get('message', "No error message found")))), None
+            else:
+                result_dict = export_task.get("result")
             if result_dict:
                 break
         if counter >= timeout_in_sec:
             return action_result.set_status(phantom.APP_ERROR, "Timeout has finished. File is not converted"), None
 
-        files_dict = result_dict.get("files", {})
+        files_dict = result_dict.get("files")
         files_dict_list = files_dict[0]
-        link = files_dict_list.get("url", "")
+        link = files_dict_list.get("url")
 
         return action_result.set_status(phantom.APP_SUCCESS, "Link fetched successfully"), link
 
@@ -670,12 +689,12 @@ class CloudConvertConnector(BaseConnector):
         if phantom.is_fail(ret_val):
             return action_result.get_status(), None, None
 
-        get_task = response.get("data", {}).get("tasks", [])
+        get_task = response.get("data").get("tasks")
         get_import_task = get_task[0]
         get_import_task_parameters = (
-            get_import_task.get("result", {}).get("form", {}).get("parameters", {})
+            get_import_task.get("result").get("form").get("parameters")
         )
-        get_import_task_job_id = get_import_task.get("job_id", "")
+        get_import_task_job_id = get_import_task.get("job_id")
         payload = get_import_task_parameters
 
         return action_result.set_status(phantom.APP_SUCCESS, "Job initialized successfully"), payload, get_import_task_job_id
