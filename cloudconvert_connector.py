@@ -579,6 +579,7 @@ class CloudConvertConnector(BaseConnector):
         sleep_seconds = 30
 
         timeout_in_sec = 60 * timeout
+        import_task, convert_task, export_task = None, None, None
 
         while counter < timeout_in_sec:
             ret_val, response = self._make_rest_call(
@@ -590,7 +591,6 @@ class CloudConvertConnector(BaseConnector):
                 return action_result.get_status(), None
             time.sleep(sleep_seconds)
             counter += sleep_seconds
-            import_task, convert_task, export_task = None, None, None
             for task in response.get("data"):
                 if task.get("job_id") == job_id:
                     if task.get('name') == 'import':
@@ -616,7 +616,7 @@ class CloudConvertConnector(BaseConnector):
                                 convert_task.get('message', "No error message found")))), None
                 return action_result.set_status(
                         phantom.APP_ERROR, "Error while converting a file. {}".format(CLOUDCONVERT_ERROR_MESSAGE_FORMAT.format(
-                            import_task.get('code', 'No error code found'), import_task.get('message', "No error message found")))), None
+                            convert_task.get('code', 'No error code found'), convert_task.get('message', "No error message found")))), None
             elif export_task.get('status') == 'error':
                 return action_result.set_status(
                         phantom.APP_ERROR, "Error while downloading the converted file. {}".format(CLOUDCONVERT_ERROR_MESSAGE_FORMAT.format(
