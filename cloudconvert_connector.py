@@ -256,7 +256,6 @@ class CloudConvertConnector(BaseConnector):
                 headers=headers,
                 data=data,
                 files=files,
-                timeout=DEFAULT_TIMEOUT_SECONDS,
                 **kwargs,
             )
         except Exception as e:
