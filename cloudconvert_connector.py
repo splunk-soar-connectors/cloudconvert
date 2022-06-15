@@ -79,13 +79,39 @@ class CloudConvertConnector(BaseConnector):
 
         return error_text
 
+    def _validate_integers(self, action_result, parameter, key, allow_zero=False):
+        """ This method is to check if the provided input parameter value
+        is a non-zero positive integer and returns the integer value of the parameter itself.
+        :param action_result: Action result or BaseConnector object
+        :param parameter: input parameter
+        :return: integer value of the parameter or None in case of failure
+        """
+
+        if parameter is not None:
+            try:
+                if not float(parameter).is_integer():
+                    return action_result.set_status(phantom.APP_ERROR, CLOUDCONVERT_VALIDATE_INTEGER_MSG.format(key=key)), None
+                parameter = int(parameter)
+
+            except Exception:
+                return action_result.set_status(phantom.APP_ERROR, CLOUDCONVERT_VALIDATE_INTEGER_MSG.format(key=key)), None
+
+            if parameter < 0:
+                return action_result.set_status(phantom.APP_ERROR,
+                                                "Please provide a valid non-negative integer value in the {} parameter".format(key)), None
+            if not allow_zero and parameter == 0:
+                return action_result.set_status(phantom.APP_ERROR,
+                                                "Please provide non-zero positive integer in {}".format(key)), None
+
+        return phantom.APP_SUCCESS, parameter
+
     def _process_empty_response(self, response, action_result):
         if response.status_code == 200:
             return RetVal(phantom.APP_SUCCESS, {})
 
         return RetVal(
             action_result.set_status(
-                phantom.APP_ERROR, "Empty response and no information in the header"
+                phantom.APP_ERROR, "Status code: {}. Empty response and no information in the header".format(response.status_code)
             ),
             None,
         )
@@ -683,7 +709,9 @@ class CloudConvertConnector(BaseConnector):
             self._state = {"app_version": self.get_app_json().get("app_version")}
 
         config = self.get_config()
-        self._timeout = config.get('timeout', 1)
+        ret_val, self._timeout = self._validate_integers(self, config.get('timeout', 1), 'timeout')
+        if phantom.is_fail(ret_val):
+            return self.get_status()
         self._api_key = config['api_key']
         self._headers = {
             "Authorization": "Bearer {}".format(self._api_key)

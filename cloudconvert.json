@@ -286,6 +286,16 @@
                     ]
                 },
                 {
+                    "data_path": "action_result.parameter.filetype",
+                    "data_type": "string",
+                    "column_name": "Output filetype",
+                    "column_order": 1
+                },
+                {
+                    "data_path": "action_result.parameter.input_filename",
+                    "data_type": "string"
+                },
+                {
                     "data_path": "action_result.data.*.vault_id",
                     "data_type": "string",
                     "contains": [
@@ -293,12 +303,6 @@
                     ],
                     "column_name": "Output file vault id",
                     "column_order": 0
-                },
-                {
-                    "data_path": "action_result.parameter.filetype",
-                    "data_type": "string",
-                    "column_name": "Output filetype",
-                    "column_order": 1
                 },
                 {
                     "data_path": "action_result.status",

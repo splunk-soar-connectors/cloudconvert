@@ -40,4 +40,5 @@ CLOUDCONVERT_ERROR_MESSAGE = "Unknown error occurred. Please check the asset con
 TYPE_ERROR_MESSAGE = "Error occurred while connecting to the HTTP server. " \
                      "Please check the asset configuration and|or the action parameters"
 CLOUDCONVERT_ERROR_MESSAGE_FORMAT = "Error code: {}. Error message: {}"
+CLOUDCONVERT_VALIDATE_INTEGER_MSG = "Please provide a valid integer value in the {key} parameter"
 DEFAULT_TIMEOUT_SECONDS = 60   # in seconds
