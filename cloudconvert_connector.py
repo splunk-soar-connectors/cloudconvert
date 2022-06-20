@@ -113,7 +113,7 @@ class CloudConvertConnector(BaseConnector):
             action_result.set_status(
                 phantom.APP_ERROR, "Status code: {}. Empty response and no information in the header".format(response.status_code)
             ),
-            None,
+            None
         )
 
     def _process_html_response(self, response, action_result):
@@ -148,7 +148,7 @@ class CloudConvertConnector(BaseConnector):
                     phantom.APP_ERROR,
                     "Unable to parse JSON response. Error: {0}".format(str(e)),
                 ),
-                None,
+                None
             )
 
         # Please specify the status codes here
@@ -182,7 +182,7 @@ class CloudConvertConnector(BaseConnector):
             return RetVal(
                 action_result.set_status(
                     phantom.APP_ERROR,
-                    "Unable to parse XML response. Error: {0}".format(error_message),
+                    "Unable to parse XML response. Error: {0}".format(error_message)
                 )
             )
 
@@ -281,9 +281,7 @@ class CloudConvertConnector(BaseConnector):
         return action_result.set_status(phantom.APP_SUCCESS)
 
     def _get_file_info_from_vault(self, action_result, vault_id, input_filename=None):
-        file_info = {
-            "id": vault_id
-        }
+        file_info = {}
 
         # Check for file in vault
         try:
@@ -315,12 +313,6 @@ class CloudConvertConnector(BaseConnector):
         file_info["path"] = vault_meta_dict["path"]
         file_info["name"] = vault_meta_dict["name"]
 
-        # We set the file type to the provided type in the action run
-        # instead of keeping it as the default detected file type.
-        if not input_filename:
-            file_type = vault_meta_dict["name"].split(".")[-1]
-            file_info["type"] = file_type
-
         return action_result.set_status(phantom.APP_SUCCESS, "File info fetched successfully"), file_info
 
     def _handle_convert_file(self, param):
@@ -339,13 +331,11 @@ class CloudConvertConnector(BaseConnector):
             input_filename = file_info["name"]
         filepath = file_info["path"]
 
-        ret_val, payload, job_id = self._initialize_job(
-            param, action_result)
+        ret_val, payload, job_id = self._initialize_job(param, action_result)
         if phantom.is_fail(ret_val):
             return action_result.get_status()
 
-        ret_val = self._import_task(
-            param, action_result, payload, filepath, input_filename)
+        ret_val = self._import_task(param, action_result, payload, filepath, input_filename)
         if phantom.is_fail(ret_val):
             return action_result.get_status()
 
@@ -353,8 +343,7 @@ class CloudConvertConnector(BaseConnector):
         if phantom.is_fail(ret_val):
             return action_result.get_status()
 
-        ret_val, vault_info = self._get_converted_file(
-            param, action_result, link, input_filename)
+        ret_val, vault_info = self._get_converted_file(param, action_result, link, input_filename)
         if phantom.is_fail(ret_val):
             return action_result.get_status()
 
@@ -384,7 +373,7 @@ class CloudConvertConnector(BaseConnector):
         self.debug_print(
             "Adding Source Data Identifier to the Vault artifact")
 
-        ret_val, message, ids = self.save_artifact(artifact)
+        ret_val, message, _ = self.save_artifacts([artifact])
         self.debug_print(
             "save_artifacts returns, value: {0}, reason: {1}".format(ret_val, message))
 
@@ -394,15 +383,17 @@ class CloudConvertConnector(BaseConnector):
             return action_result.set_status(phantom.APP_ERROR, message)
         action_result.add_data({
             "vault_id": vault_info['vault_id'],
-            "converted_file": output_filename
+            "converted_file": output_filename,
+            "file_size": cef_artifact['fileSize']
         })
         return action_result.set_status(phantom.APP_SUCCESS, "File converted successfully")
 
     def _add_vault_hashes_to_dictionary(self, cef_artifact, vault_id, container_id):
 
         try:
-            success, message, vault_info = ph_rules.vault_info(
+            _, _, vault_info = ph_rules.vault_info(
                 vault_id=vault_id, container_id=container_id)
+            cef_artifact['fileSize'] = vault_info[0].get('size')
         except Exception:
             return phantom.APP_ERROR, "Could not retrieve vault file"
 
@@ -441,7 +432,7 @@ class CloudConvertConnector(BaseConnector):
         ret_val, response = self._make_rest_call(
             url=url,
             action_result=action_result,
-            method="get",
+            method="get"
         )
         if phantom.is_fail(ret_val):
             return action_result.get_status(), None
@@ -557,8 +548,7 @@ class CloudConvertConnector(BaseConnector):
                         if vault_info:
                             for vault_meta_info in vault_info:
                                 if vault_meta_info['name'] == output_filename:
-                                    vault_result_information = [
-                                        vault_meta_info]
+                                    vault_result_information = [vault_meta_info]
                                     break
                     vault_info = list(vault_result_information)[0]
                 except IndexError:
@@ -625,8 +615,13 @@ class CloudConvertConnector(BaseConnector):
                 result_dict = export_task.get("result")
             if result_dict:
                 break
-        if counter >= timeout_in_sec:
-            return action_result.set_status(phantom.APP_ERROR, "Timeout has finished. File is not converted"), None
+            if counter >= timeout_in_sec:
+                return action_result.set_status(
+                    phantom.APP_ERROR,
+                    """Timeout has finished. File is not converted yet.
+                     Please configure higher value of 'Number of minutes to poll for converted file'
+                     asset parameter to convert the file successfully"""
+                ), None
 
         files_dict = result_dict.get("files")
         files_dict_list = files_dict[0]
@@ -684,7 +679,7 @@ class CloudConvertConnector(BaseConnector):
             action_result=action_result,
             headers=headers,
             data=payload,
-            method="post",
+            method="post"
         )
         if phantom.is_fail(ret_val):
             return action_result.get_status(), None, None

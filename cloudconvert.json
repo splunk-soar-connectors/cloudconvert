@@ -23,7 +23,7 @@
     ],
     "configuration": {
         "api_key": {
-            "description": "API Key",
+            "description": "Cloud Convert API Key",
             "data_type": "password",
             "required": true,
             "order": 0
@@ -279,21 +279,54 @@
             },
             "output": [
                 {
-                    "data_path": "action_result.parameter.vault_id",
+                    "data_path": "action_result.status",
                     "data_type": "string",
-                    "contains": [
-                        "vault id"
+                    "example_values": [
+                        "success",
+                        "failed"
                     ]
                 },
                 {
                     "data_path": "action_result.parameter.filetype",
                     "data_type": "string",
-                    "column_name": "Output filetype",
-                    "column_order": 1
+                    "example_values": [
+                        "pdf"
+                    ]
                 },
                 {
                     "data_path": "action_result.parameter.input_filename",
-                    "data_type": "string"
+                    "data_type": "string",
+                    "example_values": [
+                        "test.txt"
+                    ]
+                },
+                {
+                    "data_path": "action_result.parameter.vault_id",
+                    "data_type": "string",
+                    "contains": [
+                        "vault id"
+                    ],
+                    "example_values": [
+                        "e772e941546a76022f2ada981ef79faf1c86cf0f"
+                    ]
+                },
+                {
+                    "data_path": "action_result.data.*.converted_file",
+                    "data_type": "string",
+                    "column_name": "Converted File Name",
+                    "column_order": 1,
+                    "example_values": [
+                        "Different language characters.tex"
+                    ]
+                },
+                {
+                    "data_path": "action_result.data.*.file_size",
+                    "data_type": "string",
+                    "example_values": [
+                        "1024"
+                    ],
+                    "column_name": "Output File Size",
+                    "column_order": 2
                 },
                 {
                     "data_path": "action_result.data.*.vault_id",
@@ -301,32 +334,36 @@
                     "contains": [
                         "vault id"
                     ],
-                    "column_name": "Output file vault id",
-                    "column_order": 0
-                },
-                {
-                    "data_path": "action_result.status",
-                    "data_type": "string"
-                },
-                {
-                    "data_path": "action_result.data",
-                    "data_type": "string"
-                },
-                {
-                    "data_path": "action_result.message",
-                    "data_type": "string"
+                    "column_name": "Output File Vault ID",
+                    "column_order": 0,
+                    "example_values": [
+                        "4a2bc4c1dcaebcb93e19105b11373e81745bf7a1"
+                    ]
                 },
                 {
                     "data_path": "action_result.summary",
                     "data_type": "string"
                 },
                 {
+                    "data_path": "action_result.message",
+                    "data_type": "string",
+                    "example_values": [
+                        "File converted successfully"
+                    ]
+                },
+                {
                     "data_path": "summary.total_objects",
-                    "data_type": "numeric"
+                    "data_type": "numeric",
+                    "example_values": [
+                        1
+                    ]
                 },
                 {
                     "data_path": "summary.total_objects_successful",
-                    "data_type": "numeric"
+                    "data_type": "numeric",
+                    "example_values": [
+                        1
+                    ]
                 }
             ],
             "render": {
@@ -552,13 +589,31 @@
             },
             "output": [
                 {
-                    "data_path": "action_result.parameter.filetype",
+                    "data_path": "action_result.status",
                     "data_type": "string",
-                    "column_name": "filetype",
-                    "column_order": 0
+                    "example_values": [
+                        "success",
+                        "failed"
+                    ]
                 },
                 {
-                    "data_path": "action_result.data",
+                    "data_path": "action_result.parameter.filetype",
+                    "data_type": "string",
+                    "column_name": "Filetype",
+                    "column_order": 0,
+                    "example_values": [
+                        "pdf"
+                    ]
+                },
+                {
+                    "data_path": "action_result.data.*.input_format",
+                    "data_type": "string",
+                    "example_values": [
+                        "txt"
+                    ]
+                },
+                {
+                    "data_path": "action_result.data.*.output_format",
                     "data_type": "string"
                 },
                 {
@@ -566,20 +621,25 @@
                     "data_type": "string"
                 },
                 {
-                    "data_path": "action_result.status",
-                    "data_type": "string"
-                },
-                {
                     "data_path": "action_result.message",
-                    "data_type": "string"
+                    "data_type": "string",
+                    "example_values": [
+                        "Successfully fetched valid output formats"
+                    ]
                 },
                 {
                     "data_path": "summary.total_objects",
-                    "data_type": "numeric"
+                    "data_type": "numeric",
+                    "example_values": [
+                        1
+                    ]
                 },
                 {
                     "data_path": "summary.total_objects_successful",
-                    "data_type": "numeric"
+                    "data_type": "numeric",
+                    "example_values": [
+                        1
+                    ]
                 }
             ],
             "render": {
