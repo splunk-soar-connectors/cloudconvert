@@ -1,7 +1,7 @@
 {
     "appid": "5cf7f9aa-877a-45fb-8384-362d2b935db9",
     "name": "Cloud Convert",
-    "description": "Cloud Convert lets you convert a bunch of file types into other file types",
+    "description": "This app supports executing investigative and generic type of actions to convert files to various formats",
     "type": "endpoint",
     "product_vendor": "CloudConvert",
     "logo": "logo_cloudconvert.svg",
@@ -49,8 +49,8 @@
         {
             "action": "convert file",
             "identifier": "convert_file",
-            "description": "This action converts one filetype to another",
-            "type": "contain",
+            "description": "Convert one filetype to another",
+            "type": "generic",
             "read_only": false,
             "parameters": {
                 "vault_id": {
@@ -374,8 +374,8 @@
         {
             "action": "get valid filetypes",
             "identifier": "get_valid_filetypes",
-            "description": "This action shows valid conversions",
-            "type": "contain",
+            "description": "Get a list of valid output file formats",
+            "type": "investigate",
             "read_only": false,
             "parameters": {
                 "filetype": {

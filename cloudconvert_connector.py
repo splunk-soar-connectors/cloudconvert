@@ -26,7 +26,7 @@ import phantom.app as phantom
 import phantom.rules as ph_rules
 import requests
 import xmltodict
-from bs4 import BeautifulSoup, UnicodeDammit
+from bs4 import UnicodeDammit
 from phantom.action_result import ActionResult
 from phantom.base_connector import BaseConnector
 from phantom.vault import Vault
@@ -98,10 +98,10 @@ class CloudConvertConnector(BaseConnector):
 
             if parameter < 0:
                 return action_result.set_status(phantom.APP_ERROR,
-                                                "Please provide a valid non-negative integer value in the {} parameter".format(key)), None
+                                                CLOUDCONVERT_VALIDATE_NON_NEGATIVE_INTEGER_MSG.format(key=key)), None
             if not allow_zero and parameter == 0:
                 return action_result.set_status(phantom.APP_ERROR,
-                                                "Please provide non-zero positive integer in {}".format(key)), None
+                                                CLOUDCONVERT_VALIDATE_NON_ZERO_POSITIVE_INTEGER_MSG.format(key=key)), None
 
         return phantom.APP_SUCCESS, parameter
 
@@ -116,37 +116,16 @@ class CloudConvertConnector(BaseConnector):
             None
         )
 
-    def _process_html_response(self, response, action_result):
-        status_code = response.status_code
-
-        try:
-            soup = BeautifulSoup(response.text, "html.parser")
-            # Remove the script, style, footer and navigation part from the HTML message
-            for element in soup(["script", "style", "footer", "nav"]):
-                element.extract()
-            error_text = soup.text
-            split_lines = error_text.split("\n")
-            split_lines = [x.strip() for x in split_lines if x.strip()]
-            error_text = "\n".join(split_lines)
-        except Exception:
-            error_text = "Cannot parse error details"
-
-        message = "Status Code: {0}. Data from server:\n{1}\n".format(
-            status_code, error_text
-        )
-
-        message = message.replace("{", "{{").replace("}", "}}")
-        return RetVal(action_result.set_status(phantom.APP_ERROR, message), None)
-
     def _process_json_response(self, r, action_result):
         # Try a json parse
         try:
             resp_json = r.json()
         except Exception as e:
+            error_message = self._get_error_message_from_exception(e)
             return RetVal(
                 action_result.set_status(
                     phantom.APP_ERROR,
-                    "Unable to parse JSON response. Error: {0}".format(str(e)),
+                    "Unable to parse JSON response. Error: {0}".format(error_message),
                 ),
                 None
             )
@@ -188,9 +167,11 @@ class CloudConvertConnector(BaseConnector):
 
         if 200 <= r.status_code < 400:
             return RetVal(phantom.APP_SUCCESS, resp_xml)
+        error_code = resp_xml.get('Error', {}).get('Code')
+        error_message = resp_xml.get('Error', {}).get('Message')
 
-        message = "Error from server. Status Code: {0} Data from server: {1}".format(
-            r.status_code, r.text.replace("{", "{{").replace("}", "}}")
+        message = "Error from server. Status Code: {0} Data from server: {1}. {2}".format(
+            r.status_code, error_code, error_message
         )
 
         return RetVal(action_result.set_status(phantom.APP_ERROR, message), resp_xml)
@@ -199,7 +180,6 @@ class CloudConvertConnector(BaseConnector):
         # store the r_text in debug data, it will get dumped in the logs if the action fails
         if hasattr(action_result, "add_debug_data"):
             action_result.add_debug_data({"r_status_code": r.status_code})
-            action_result.add_debug_data({"r_text": r.text})
             if not self._stream_file_data:
                 action_result.add_debug_data({'r_text': r.text})
             action_result.add_debug_data({'r_headers': r.headers})
@@ -209,9 +189,6 @@ class CloudConvertConnector(BaseConnector):
 
         if "json" in r.headers.get("Content-Type", ""):
             return self._process_json_response(r, action_result)
-
-        if "html" in r.headers.get("Content-Type", ""):
-            return self._process_html_response(r, action_result)
 
         if "xml" in r.headers.get("Content-Type", ""):
             return self._process_xml_response(r, action_result)
@@ -230,7 +207,6 @@ class CloudConvertConnector(BaseConnector):
         url,
         action_result,
         headers=None,
-        params=None,
         files=None,
         data=None,
         method="get",
@@ -325,7 +301,7 @@ class CloudConvertConnector(BaseConnector):
             action_result, vault_id, input_filename
         )
         if phantom.is_fail(ret_val):
-            return ret_val
+            return action_result.get_status()
 
         if not input_filename:
             input_filename = file_info["name"]
@@ -579,7 +555,6 @@ class CloudConvertConnector(BaseConnector):
             )
             if phantom.is_fail(ret_val):
                 return action_result.get_status(), None
-            time.sleep(sleep_seconds)
             counter += sleep_seconds
             for task in response.get("data"):
                 if task.get("job_id") == job_id:
@@ -615,6 +590,7 @@ class CloudConvertConnector(BaseConnector):
                 result_dict = export_task.get("result")
             if result_dict:
                 break
+            time.sleep(sleep_seconds)
             if counter >= timeout_in_sec:
                 return action_result.set_status(
                     phantom.APP_ERROR,
@@ -684,10 +660,10 @@ class CloudConvertConnector(BaseConnector):
         if phantom.is_fail(ret_val):
             return action_result.get_status(), None, None
 
-        get_task = response.get("data").get("tasks")
+        get_task = response.get("data", {}).get("tasks", {})
         get_import_task = get_task[0]
         get_import_task_parameters = (
-            get_import_task.get("result").get("form").get("parameters")
+            get_import_task.get("result", {}).get("form", {}).get("parameters", {})
         )
         get_import_task_job_id = get_import_task.get("job_id")
         payload = get_import_task_parameters
@@ -719,7 +695,7 @@ class CloudConvertConnector(BaseConnector):
         self._state = self.load_state()
         if not isinstance(self._state, dict):
             self.debug_print("Resetting the state file with the default format")
-            self._state = {"app_version": self.get_app_json().get("app_version")}
+            self._state = {}
 
         config = self.get_config()
         ret_val, self._timeout = self._validate_integers(self, config.get('timeout', 1), 'timeout')
