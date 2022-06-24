@@ -24,7 +24,7 @@
 
 <body>
   <p>
-    This app integrates with Cloud Convert to convert the files to a specified format.</a>
+    This app integrates with Cloud Convert to convert the files to specified format.</a>
   </p>
   <h2>Port Details</h2>
   <p>
@@ -48,16 +48,16 @@
       </table>
   </p>
   <p>
-    <h2>Steps to Configure the Cloud Convert Phantom app's asset</h2>
+    <h2>Steps to Configure the Cloud Convert Splunk SOAR app's asset</h2>
     <p>
-      Follow these steps to configure the Cloud Convert Phantom app's asset:
+      Follow these steps to configure the Cloud Convert Splunk SOAR app's asset:
       <ul>
         <li>Log in to the Cloud Convert platform.</li>
         <ul>
           <li>Once logged in, select <b>Dashboard</b> by clicking the user's profile logo.</li>
-          <li>In API section, go to <b>Authorization</b>.</li>
+          <li>In the API section, go to <b>Authorization</b>.</li>
           <li>Click on <b>API Keys</b> and <b>Create new</b>.</li>
-          <li>Now, give any name to your key and give the below mention scopes to it:
+          <li>Now, give any name to your key and give the below-mentioned scopes to it:
             <ul>
               <li>user.read: View your user data</li>
               <li>user.write: Update your user data</li>
@@ -69,7 +69,7 @@
           <li>Copy the generated API Key.</li>
           <li>NOTE: The API key generated will be shown only once. So store it safely.</li>
         </ul>
-        <li>Now, Log in to your Phantom instance.</li>
+        <li>Now, Log in to your Splunk SOAR instance.</li>
         <ul>
           <li>Navigate to the <b>Home</b> dropdown and select <b>Apps</b>.</li>
           <li>Search the Cloud Convert App from the search box.</li>
@@ -78,22 +78,20 @@
           </li>
           <li>Navigate to the <b>Asset Settings</b>.</li>
           <li>Paste the generated <b>API Key</b> from Cloud Convert UI to its respective configuration parameter.</li>
-          <li>Mention the number of minutes to poll to convert file. Default is 1 minute.</li>
+          <li>Mention the number of minutes to poll to convert a file. Default is 1 minute.</li>
           <li>Save the asset.</li>
-          <li>Now, test the connectivity of the Phantom server to the Cloud Convert instance by clicking the <b>TEST CONNECTIVITY</b> button.</li>
+          <li>Now, test the connectivity of the Splunk SOAR server to the Cloud Convert instance by clicking the <b>TEST CONNECTIVITY</b> button.</li>
         </ul>
       </ul>
 
     <h2>Explanation of the Asset Configuration Parameters</h2>
-    The asset configuration parameters affect 'test connectivity' and some
-    other actions of the application. The parameters related to test
-    connectivity action is API Key and Number of minutes to poll for converted file.
+    The asset configuration parameters affect 'test connectivity' and some other actions of the application. The parameters related to test connectivity action are API Key and Number of minutes to poll for the converted file.
     <ul>
       <li>
         <b>API Key: </b> API Token for asset authorization.
       </li>
       <li>
-        <b>Number of minutes to poll for converted file: </b> Number of minutes user wants to take to convert any file. The default time is one minute
+        <b>Number of minutes to poll for converted file: </b> The number of minutes the user wants to take to convert any file. The default time is one minute.
       </li>
     </ul>
   </p>
@@ -103,7 +101,7 @@
       <li>
         <h3>Test Connectivity (Action Workflow Details)</h3>
         <ul>
-          <li> This action will test the connectivity of the Phantom server to the Cloud Convert instance by making an
+          <li> This action will test the connectivity of the Splunk SOAR server to the Cloud Convert instance by making an
             initial API call using the provided asset configuration parameters. </li>
           <li> The action validates the provided asset configuration parameters. Based on the API call response, the
             appropriate success and failure message will be displayed when the action gets executed.</li>
@@ -112,10 +110,10 @@
 
       <li>
         <h3>Get Valid Filetypes</h3>
-        In order to retrieve information of valid input-output formats, user can run this action.
+        To retrieve information of valid input-output formats, the user can run this action.
         <ul>
           <li><b>Action Parameter</b>: Input filetype</li>
-          This is a required parameter. The input filetype supports 200 filetypes. On selecting any one of the input format, the action generates a custom view listing valid output formats for the specified input format.
+          This is a required parameter. The input filetype supports 200 filetypes. On selecting any one of the input format, the action generates a custom view listing valid output formats.
         </ul>
       </li>
       <li>
@@ -124,15 +122,15 @@
         <ul>
           <li><b>Action Parameter: Vault ID</b></li>
           <ul>
-            <li>This parameter is the unique id for any file and it is a required parameter. In case if file content of more than one file is same but have different filename then vault id will be same for all those files.</li>
+            <li>This parameter is the unique id for any file and it is a required parameter. In case if file content of more than one file is the same but has a different filename then the vault id will be the same for all those files.</li>
           </ul>
           <li><b>Action Parameter: Filetype</b></li>
           <ul>
-            <li>This parameter is a required parameter and a dropdown box which lists all the output formats in which user wants their file to be converted into.</li>
+            <li>This parameter is a required parameter and a dropdown box that lists all the output formats into which user wants their file to be converted.</li>
           </ul>
           <li><b>Action Parameter: Input filename</b></li>
           <ul>
-            <li>This parameter is optional parameter and user need to provide name alongwith extension of the file which has been uploaded in the vault. In case of different vault id of files, user does not need to provide this parameter. If the vault id of more than one file is similar, then user need to provide the input filename of the file uploaded in vault. In case if the vault id is similar and user does not provide the input filename, then output generated file could be any of the similar vault id.</li>
+            <li>This parameter is an optional parameter and the user needs to provide a name along with an extension of the file which has been uploaded to the vault. In the case of different vault IDs of files, a user does not need to provide this parameter. If the vault id of more than one file is similar, then the user needs to provide the input filename of the file uploaded to the vault. In case the vault id is similar and the user does not provide the input filename, then the output generated file could be any of the similar vault ids.</li>
           </ul>
       </li>
 </body>
