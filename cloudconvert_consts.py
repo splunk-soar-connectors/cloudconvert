@@ -19,8 +19,8 @@ CLOUDCONVERT_STATE_FILE_CORRUPT_ERR = (
 # Test Connectivity endpoints
 CLOUDCONVERT_CONNECTION_MSG = 'Querying endpoint to verify the credentials provided'
 TEST_CONNECTIVITY_URL = 'https://api.cloudconvert.com/v2/users/me'
-CLOUDCONVERT_CONNECTIVITY_FAIL_MSG = 'Test Connectivity Failed'
-CLOUDCONVERT_CONNECTIVITY_PASS_MSG = 'Test Connectivity Passed'
+CLOUDCONVERT_CONNECTIVITY_FAIL_MSG = 'Test connectivity failed'
+CLOUDCONVERT_CONNECTIVITY_PASS_MSG = 'Test connectivity passed'
 # Asset config parameters
 CLOUDCONVERT_CONFIG_API_KEY = 'api_key'  # pragma: allowlist secret
 # Get file info from vault
