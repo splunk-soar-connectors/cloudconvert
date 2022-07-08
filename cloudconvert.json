@@ -1,7 +1,7 @@
 {
     "appid": "5cf7f9aa-877a-45fb-8384-362d2b935db9",
     "name": "Cloud Convert",
-    "description": "This app supports executing investigative and generic type of actions to convert the files to various formats",
+    "description": "This app supports executing investigative and generic type of actions to convert the SOAR vault files to various formats",
     "type": "endpoint",
     "product_vendor": "CloudConvert",
     "logo": "logo_cloudconvert.svg",
