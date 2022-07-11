@@ -556,8 +556,8 @@ class CloudConvertConnector(BaseConnector):
             if phantom.is_fail(ret_val):
                 return action_result.get_status(), None
             counter += sleep_seconds
-            for task in response.get("data"):
-                if task.get("job_id") == job_id:
+            for task in response.get('data'):
+                if task.get('job_id') == job_id:
                     if task.get('name') == 'import':
                         import_task = task
                         continue
@@ -587,7 +587,7 @@ class CloudConvertConnector(BaseConnector):
                         phantom.APP_ERROR, "Error while downloading the converted file. {}".format(CLOUDCONVERT_ERROR_MESSAGE_FORMAT.format(
                             export_task.get('code', 'No error code found'), export_task.get('message', "No error message found")))), None
             else:
-                result_dict = export_task.get("result")
+                result_dict = export_task.get('result')
             if result_dict:
                 break
             time.sleep(sleep_seconds)
@@ -599,9 +599,9 @@ class CloudConvertConnector(BaseConnector):
                      asset parameter to convert the file successfully"""
                 ), None
 
-        files_dict = result_dict.get("files")
+        files_dict = result_dict.get('files')
         files_dict_list = files_dict[0]
-        link = files_dict_list.get("url")
+        link = files_dict_list.get('url')
 
         return action_result.set_status(phantom.APP_SUCCESS, "Link fetched successfully"), link
 
