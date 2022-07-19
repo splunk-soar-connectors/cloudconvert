@@ -270,9 +270,9 @@ class CloudConvertConnector(BaseConnector):
                         vault_id
                     )
                 )
-                return action_result.set_status(phantom.APP_ERROR, CLOUDCONVERT_ERR_FILE_NOT_IN_VAULT), None
+                return action_result.set_status(phantom.APP_ERROR, CLOUDCONVERT_ERROR_FILE_NOT_IN_VAULT), None
         except Exception:
-            return action_result.set_status(phantom.APP_ERROR, CLOUDCONVERT_ERR_FILE_NOT_IN_VAULT), None
+            return action_result.set_status(phantom.APP_ERROR, CLOUDCONVERT_ERROR_FILE_NOT_IN_VAULT), None
 
         vault_meta = list(vault_meta)
         vault_meta_dict = {}
@@ -282,7 +282,7 @@ class CloudConvertConnector(BaseConnector):
                     vault_meta_dict.update(vault_data)
                     break
             if not vault_meta_dict:
-                return action_result.set_status(phantom.APP_ERROR, CLOUDCONVERT_ERR_FILENAME_NOT_IN_VAULT), None
+                return action_result.set_status(phantom.APP_ERROR, CLOUDCONVERT_ERROR_FILENAME_NOT_IN_VAULT), None
         else:
             vault_meta_dict = vault_meta[0]
 
