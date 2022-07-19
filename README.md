@@ -36,7 +36,7 @@ This app integrates with Cloud Convert to convert the files to specified format.
 
 ## Port Details
 
-The app uses HTTP/ HTTPS protocol for communicating with the Cloud Convert server. Below are the
+The app uses HTTP/HTTPS protocol for communicating with the Cloud Convert server. Below are the
 default ports used by the Splunk SOAR Connector.
 
 | SERVICE NAME | TRANSPORT PROTOCOL | PORT |
@@ -120,7 +120,7 @@ poll for the converted file.
 
         -   This parameter is the unique id for any file and it is a required parameter. In case if
             file content of more than one file is the same but has a different filename then the
-            vault id will be the same for all those files.
+            vault ID will be the same for all those files.
 
     -   **Action Parameter: Filetype**
 
@@ -135,11 +135,11 @@ poll for the converted file.
 
         -   This parameter is an optional parameter and the user needs to provide a name along with
             an extension of the file which has been uploaded to the vault. In the case of different
-            vault IDs of files, a user does not need to provide this parameter. If the vault id of
+            vault IDs of files, a user does not need to provide this parameter. If the vault ID of
             more than one file is similar, then the user needs to provide the input filename of the
-            file uploaded to the vault. In case the vault id is similar and the user does not
+            file uploaded to the vault. In case the vault ID is similar and the user does not
             provide the input filename, then the output generated file could be any of the similar
-            vault ids.
+            vault IDs.
 
 
 ### Configuration Variables
