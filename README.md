@@ -2,11 +2,11 @@
 # Cloud Convert
 
 Publisher: Splunk  
-Connector Version: 1\.0\.1  
+Connector Version: 1.0.1  
 Product Vendor: CloudConvert  
 Product Name: CloudConvert  
-Product Version Supported (regex): "\.\*"  
-Minimum Product Version: 5\.2\.0  
+Product Version Supported (regex): ".\*"  
+Minimum Product Version: 6.1.0  
 
 This app supports executing investigative and generic type of actions to convert the SOAR vault files to various formats
 
@@ -147,8 +147,8 @@ The below configuration variables are required for this Connector to operate.  T
 
 VARIABLE | REQUIRED | TYPE | DESCRIPTION
 -------- | -------- | ---- | -----------
-**api\_key** |  required  | password | Cloud Convert API Key
-**timeout** |  optional  | numeric | Number of minutes to poll for converted file \(Default\: 1\)
+**api_key** |  required  | password | Cloud Convert API Key
+**timeout** |  optional  | numeric | Number of minutes to poll for converted file (Default: 1)
 
 ### Supported Actions  
 [test connectivity](#action-test-connectivity) - Validate the asset configuration for connectivity using supplied configuration  
@@ -176,24 +176,24 @@ Read only: **False**
 #### Action Parameters
 PARAMETER | REQUIRED | DESCRIPTION | TYPE | CONTAINS
 --------- | -------- | ----------- | ---- | --------
-**vault\_id** |  required  | Vault ID | string |  `vault id` 
+**vault_id** |  required  | Vault ID | string |  `vault id` 
 **filetype** |  required  | Type of the file in output | string | 
-**input\_filename** |  optional  | Name of the input file with extension | string | 
+**input_filename** |  optional  | Name of the input file with extension | string | 
 
 #### Action Output
-DATA PATH | TYPE | CONTAINS
---------- | ---- | --------
-action\_result\.status | string | 
-action\_result\.parameter\.filetype | string | 
-action\_result\.parameter\.input\_filename | string | 
-action\_result\.parameter\.vault\_id | string |  `vault id` 
-action\_result\.data\.\*\.converted\_file | string | 
-action\_result\.data\.\*\.file\_size | string | 
-action\_result\.data\.\*\.vault\_id | string |  `vault id` 
-action\_result\.summary | string | 
-action\_result\.message | string | 
-summary\.total\_objects | numeric | 
-summary\.total\_objects\_successful | numeric |   
+DATA PATH | TYPE | CONTAINS | EXAMPLE VALUES
+--------- | ---- | -------- | --------------
+action_result.status | string |  |   success  failed 
+action_result.parameter.filetype | string |  |   pdf 
+action_result.parameter.input_filename | string |  |   test.txt 
+action_result.parameter.vault_id | string |  `vault id`  |   e772e941546a76022f2ada981ef79faf1c86cf0f 
+action_result.data.\*.converted_file | string |  |   Different language characters.tex 
+action_result.data.\*.file_size | string |  |   1024 
+action_result.data.\*.vault_id | string |  `vault id`  |   4a2bc4c1dcaebcb93e19105b11373e81745bf7a1 
+action_result.summary | string |  |  
+action_result.message | string |  |   File converted successfully 
+summary.total_objects | numeric |  |   1 
+summary.total_objects_successful | numeric |  |   1   
 
 ## action: 'get valid filetypes'
 Get a list of valid output file formats
@@ -207,13 +207,13 @@ PARAMETER | REQUIRED | DESCRIPTION | TYPE | CONTAINS
 **filetype** |  required  | Type of the file | string | 
 
 #### Action Output
-DATA PATH | TYPE | CONTAINS
---------- | ---- | --------
-action\_result\.status | string | 
-action\_result\.parameter\.filetype | string | 
-action\_result\.data\.\*\.input\_format | string | 
-action\_result\.data\.\*\.output\_format | string | 
-action\_result\.summary | string | 
-action\_result\.message | string | 
-summary\.total\_objects | numeric | 
-summary\.total\_objects\_successful | numeric | 
+DATA PATH | TYPE | CONTAINS | EXAMPLE VALUES
+--------- | ---- | -------- | --------------
+action_result.status | string |  |   success  failed 
+action_result.parameter.filetype | string |  |   pdf 
+action_result.data.\*.input_format | string |  |   txt 
+action_result.data.\*.output_format | string |  |  
+action_result.summary | string |  |  
+action_result.message | string |  |   Successfully fetched valid output formats 
+summary.total_objects | numeric |  |   1 
+summary.total_objects_successful | numeric |  |   1 
