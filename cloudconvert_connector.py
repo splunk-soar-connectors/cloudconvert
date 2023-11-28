@@ -30,6 +30,7 @@ from bs4 import UnicodeDammit
 from phantom.action_result import ActionResult
 from phantom.base_connector import BaseConnector
 from phantom.vault import Vault
+from phantom_common import paths
 
 # Usage of the consts file is recommended
 from cloudconvert_consts import *
@@ -463,7 +464,7 @@ class CloudConvertConnector(BaseConnector):
             vault_tmp_dir = Vault.get_vault_tmp_dir().rstrip('/')
             local_dir = '{}/{}'.format(vault_tmp_dir, guid)
         else:
-            local_dir = '/opt/phantom/vault/tmp/{}'.format(guid)
+            local_dir = os.path.join(paths.PHANTOM_VAULT, "tmp", guid)
         output_filename = "{}.{}".format(filename, output_filetype)
 
         self.save_progress("Using temp directory: {0}".format(guid))
