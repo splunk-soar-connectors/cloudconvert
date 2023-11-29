@@ -2,7 +2,7 @@
 # Cloud Convert
 
 Publisher: Splunk  
-Connector Version: 1.0.1  
+Connector Version: 1.0.2  
 Product Vendor: CloudConvert  
 Product Name: CloudConvert  
 Product Version Supported (regex): ".\*"  
