@@ -1,6 +1,6 @@
 # File: cloudconvert_connector.py
 #
-# Copyright (c) 2022 Splunk Inc.
+# Copyright (c) 2022-2023 Splunk Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ from bs4 import UnicodeDammit
 from phantom.action_result import ActionResult
 from phantom.base_connector import BaseConnector
 from phantom.vault import Vault
+from phantom_common import paths
 
 # Usage of the consts file is recommended
 from cloudconvert_consts import *
@@ -58,15 +59,15 @@ class CloudConvertConnector(BaseConnector):
         :param e: Exception object
         :return: error message
         """
-        error_msg = CLOUDCONVERT_ERROR_MESSAGE
-        error_code = CLOUDCONVERT_ERROR_CODE_MESSAGE
+        error_msg = CLOUDCONVERT_ERROR_MSG
+        error_code = CLOUDCONVERT_ERROR_CODE_MSG
         try:
             if hasattr(e, "args"):
                 if len(e.args) > 1:
                     error_code = e.args[0]
                     error_msg = e.args[1]
                 elif len(e.args) == 1:
-                    error_code = CLOUDCONVERT_ERROR_CODE_MESSAGE
+                    error_code = CLOUDCONVERT_ERROR_CODE_MSG
                     error_msg = e.args[0]
         except Exception as ex:
             self.debug_print("Exception: {}".format(ex))
@@ -75,7 +76,7 @@ class CloudConvertConnector(BaseConnector):
         if not error_code:
             error_text = "Error Message: {}".format(error_msg)
         else:
-            error_text = CLOUDCONVERT_ERROR_MESSAGE_FORMAT.format(error_code, error_msg)
+            error_text = CLOUDCONVERT_ERROR_MSG_FORMAT.format(error_code, error_msg)
 
         return error_text
 
@@ -463,7 +464,7 @@ class CloudConvertConnector(BaseConnector):
             vault_tmp_dir = Vault.get_vault_tmp_dir().rstrip('/')
             local_dir = '{}/{}'.format(vault_tmp_dir, guid)
         else:
-            local_dir = '/opt/phantom/vault/tmp/{}'.format(guid)
+            local_dir = os.path.join(paths.PHANTOM_VAULT, "tmp", guid)
         output_filename = "{}.{}".format(filename, output_filetype)
 
         self.save_progress("Using temp directory: {0}".format(guid))
@@ -571,20 +572,20 @@ class CloudConvertConnector(BaseConnector):
                         break
             if import_task.get('status') == 'error':
                 return action_result.set_status(
-                        phantom.APP_ERROR, "Error while uploading a file. {}".format(CLOUDCONVERT_ERROR_MESSAGE_FORMAT.format(
+                        phantom.APP_ERROR, "Error while uploading a file. {}".format(CLOUDCONVERT_ERROR_MSG_FORMAT.format(
                             import_task.get('code', 'No error code found'), import_task.get('message', "No error message found")))), None
             elif convert_task.get('status') == 'error':
                 if convert_task.get('code') == "INVALID_CONVERSION_TYPE":
                     return action_result.set_status(phantom.APP_ERROR,
                        "Error while converting a file. {}. Please run the 'get valid filetypes' action to get valid output file formats".format(
-                            CLOUDCONVERT_ERROR_MESSAGE_FORMAT.format(convert_task.get('code', 'No error code found'),
+                            CLOUDCONVERT_ERROR_MSG_FORMAT.format(convert_task.get('code', 'No error code found'),
                                 convert_task.get('message', "No error message found")))), None
                 return action_result.set_status(
-                        phantom.APP_ERROR, "Error while converting a file. {}".format(CLOUDCONVERT_ERROR_MESSAGE_FORMAT.format(
+                        phantom.APP_ERROR, "Error while converting a file. {}".format(CLOUDCONVERT_ERROR_MSG_FORMAT.format(
                             convert_task.get('code', 'No error code found'), convert_task.get('message', "No error message found")))), None
             elif export_task.get('status') == 'error':
                 return action_result.set_status(
-                        phantom.APP_ERROR, "Error while downloading the converted file. {}".format(CLOUDCONVERT_ERROR_MESSAGE_FORMAT.format(
+                        phantom.APP_ERROR, "Error while downloading the converted file. {}".format(CLOUDCONVERT_ERROR_MSG_FORMAT.format(
                             export_task.get('code', 'No error code found'), export_task.get('message', "No error message found")))), None
             else:
                 result_dict = export_task.get('result')
