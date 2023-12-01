@@ -6,7 +6,7 @@ Connector Version: 1.0.2
 Product Vendor: CloudConvert  
 Product Name: CloudConvert  
 Product Version Supported (regex): ".\*"  
-Minimum Product Version: 5.2.0  
+Minimum Product Version: 6.1.0  
 
 This app supports executing investigative and generic type of actions to convert the SOAR vault files to various formats
 
