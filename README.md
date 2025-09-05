@@ -1,7 +1,7 @@
 # Cloud Convert
 
 Publisher: Splunk \
-Connector Version: 1.0.2 \
+Connector Version: 1.0.3 \
 Product Vendor: CloudConvert \
 Product Name: CloudConvert \
 Minimum Product Version: 6.1.0
