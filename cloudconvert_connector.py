@@ -18,6 +18,7 @@
 
 import json
 import os
+import re
 import time
 import uuid
 
@@ -38,6 +39,21 @@ from cloudconvert_consts import *
 class RetVal(tuple):
     def __new__(cls, val1, val2=None):
         return tuple.__new__(RetVal, (val1, val2))
+
+
+def _build_output_path(local_dir, filename, output_filetype):
+    if not re.fullmatch(r"[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*", output_filetype):
+        raise ValueError("Output filetype contains invalid characters")
+
+    safe_filename = os.path.basename(str(filename).replace("\\", "/"))
+    filename_stem = safe_filename.rsplit(".", 1)[0] or "converted_file"
+    output_filename = f"{filename_stem}.{output_filetype}"
+    real_local_dir = os.path.realpath(local_dir)
+    output_path = os.path.realpath(os.path.join(real_local_dir, output_filename))
+    if os.path.commonpath((real_local_dir, output_path)) != real_local_dir:
+        raise ValueError("Output path escapes the vault temporary directory")
+
+    return output_filename, output_path
 
 
 class CloudConvertConnector(BaseConnector):
@@ -383,7 +399,6 @@ class CloudConvertConnector(BaseConnector):
     def _get_converted_file(self, param, action_result, link, filename):
         url = link
         output_filetype = param["filetype"]
-        filename = filename.split(".")[0]
         self._stream_file_data = True
 
         ret_val, response = self._make_rest_call(url=url, action_result=action_result, method="get", empty_headers=True)
@@ -397,7 +412,10 @@ class CloudConvertConnector(BaseConnector):
             local_dir = f"{vault_tmp_dir}/{guid}"
         else:
             local_dir = os.path.join(paths.PHANTOM_VAULT, "tmp", guid)
-        output_filename = f"{filename}.{output_filetype}"
+        try:
+            output_filename, compressed_file_path = _build_output_path(local_dir, filename, output_filetype)
+        except ValueError as e:
+            return action_result.set_status(phantom.APP_ERROR, str(e)), None
 
         self.save_progress(f"Using temp directory: {guid}")
         self.debug_print(f"Using temp directory: {guid}")
@@ -408,8 +426,6 @@ class CloudConvertConnector(BaseConnector):
             return action_result.set_status(
                 phantom.APP_ERROR, "Unable to create temporary vault folder.", self._get_error_message_from_exception(e)
             ), None
-
-        compressed_file_path = f"{local_dir}/{output_filename}"
 
         # Try to stream the response to a file
         if response.status_code == 200:
