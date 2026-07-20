@@ -1,9 +1,9 @@
 # Cloud Convert
 
-Publisher: Splunk \
-Connector Version: 1.0.3 \
-Product Vendor: CloudConvert \
-Product Name: CloudConvert \
+Publisher: Splunk <br>
+Connector Version: 1.0.3 <br>
+Product Vendor: CloudConvert <br>
+Product Name: CloudConvert <br>
 Minimum Product Version: 6.1.0
 
 This app supports executing investigative and generic type of actions to convert the SOAR vault files to various formats
@@ -117,15 +117,15 @@ VARIABLE | REQUIRED | TYPE | DESCRIPTION
 
 ### Supported Actions
 
-[test connectivity](#action-test-connectivity) - Validate the asset configuration for connectivity using supplied configuration \
-[convert file](#action-convert-file) - Convert one filetype to another \
+[test connectivity](#action-test-connectivity) - Validate the asset configuration for connectivity using supplied configuration <br>
+[convert file](#action-convert-file) - Convert one filetype to another <br>
 [get valid filetypes](#action-get-valid-filetypes) - Get a list of valid output file formats
 
 ## action: 'test connectivity'
 
 Validate the asset configuration for connectivity using supplied configuration
 
-Type: **test** \
+Type: **test** <br>
 Read only: **True**
 
 #### Action Parameters
@@ -140,7 +140,7 @@ No Output
 
 Convert one filetype to another
 
-Type: **generic** \
+Type: **generic** <br>
 Read only: **False**
 
 #### Action Parameters
@@ -171,7 +171,7 @@ summary.total_objects_successful | numeric | | 1 |
 
 Get a list of valid output file formats
 
-Type: **investigate** \
+Type: **investigate** <br>
 Read only: **False**
 
 #### Action Parameters
@@ -197,7 +197,7 @@ ______________________________________________________________________
 
 Auto-generated Splunk SOAR Connector documentation.
 
-Copyright 2025 Splunk Inc.
+Copyright 2026 Splunk Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

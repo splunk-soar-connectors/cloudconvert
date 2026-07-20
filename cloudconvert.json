@@ -10,7 +10,7 @@
     "python_version": "3.9, 3.13",
     "product_version_regex": ".*",
     "publisher": "Splunk",
-    "license": "Copyright (c) 2022-2025 Splunk Inc.",
+    "license": "Copyright (c) 2022-2026 Splunk Inc.",
     "app_version": "1.0.3",
     "utctime_updated": "2025-09-05T19:38:03.727850Z",
     "package_name": "phantom_cloudconvert",
